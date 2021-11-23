@@ -92,6 +92,28 @@ static bool valid_length(size_t rate_idx, size_t length)
     return false;
 }
 
+int fvad_feed(Fvad *inst, char *buffer, size_t size)
+{
+	static size_t pos = 0;
+	static char buf[1024+304] = {0};
+	int rv;
+	if (pos != 0) {
+		memcpy(buf+pos, buffer, size);
+	} else {
+		memcpy(buf, buffer, size);
+	}
+	pos += size;
+
+	int y = pos%320;
+	int s = pos/320;
+	int i;
+	for (i = 0; i < s; i++) {
+		rv = fvad_process(inst, (short *)(buf + i*320), 160);
+	}
+	memcpy(buffer, buf + s*320, y);
+	pos += y;
+	return rv;
+}
 
 int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 {

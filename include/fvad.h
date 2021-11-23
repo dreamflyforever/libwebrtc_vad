@@ -89,6 +89,8 @@ int fvad_set_sample_rate(Fvad* inst, int sample_rate);
  */
 int fvad_process(Fvad* inst, const int16_t* frame, size_t length);
 
+int fvad_feed(Fvad *inst, char *buffer, size_t size);
+
 #ifdef __cplusplus
 }
 #endif
