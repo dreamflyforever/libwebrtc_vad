@@ -32,6 +32,8 @@ static const size_t valid_frame_times[] = { 10, 20, 30 };
 struct Fvad {
     VadInstT core;
     size_t rate_idx; // index in valid_rates and process_funcs arrays
+    size_t count;
+    size_t time;
 };
 
 
@@ -39,6 +41,7 @@ Fvad *fvad_new(void)
 {
     Fvad *inst = malloc(sizeof *inst);
     if (inst) fvad_reset(inst);
+    inst->count = 0;
     return inst;
 }
 
@@ -117,13 +120,28 @@ int fvad_feed(Fvad *inst, char *buffer, size_t size)
 
 int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 {
-    assert(inst);
-    if (!valid_length(inst->rate_idx, length))
-        return -1;
+	assert(inst);
+	if (!valid_length(inst->rate_idx, length))
+		return -1;
 
-    int rv = process_funcs[inst->rate_idx](&inst->core, frame, length);
-    assert (rv >= 0);
-    if (rv > 0) rv = 1;
+	int rv = process_funcs[inst->rate_idx](&inst->core, frame, length);
+	assert (rv >= 0);
 
-    return rv;
+	if (rv > 0) {
+		rv = 1;
+	} else {
+		/*sum the count*/
+		inst->count++;
+		if (inst->count >= inst->time) inst->count = 0;
+		else rv = 1;
+	}
+
+	return rv;
+}
+
+int fvad_settime(Fvad* inst, size_t t)
+{
+	int retval = 0;
+	inst->time = t;
+	return retval;
 }

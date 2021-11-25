@@ -91,6 +91,8 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length);
 
 int fvad_feed(Fvad *inst, char *buffer, size_t size);
 
+int fvad_settime(Fvad* inst, size_t t);
+
 #ifdef __cplusplus
 }
 #endif
