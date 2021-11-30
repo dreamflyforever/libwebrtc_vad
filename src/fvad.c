@@ -295,7 +295,7 @@ void fvad_reset(Fvad *inst)
 
     int rv = WebRtcVad_InitCore(&inst->core);
     assert(rv == 0);
-    inst->rate_idx = 0;
+    inst->rate_idx = 1;
 }
 
 

@@ -19,11 +19,15 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 
+#define SPEECH 1
+#define SILENT 0
+#define ERROR -1
+
 /*
  * Type for a VAD instance, an opaque object created using fvad_new().
  */
 typedef struct Fvad Fvad;
-
+typedef struct Fvad vad_str;
 
 /*
  * Creates and initializes a VAD instance.
@@ -92,6 +96,12 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length);
 int fvad_feed(Fvad *inst, char *buffer, size_t size);
 
 int fvad_settime(Fvad* inst, size_t t);
+
+
+#define vad_init(entity, cb, arg) fvad_new(void)
+#define vad_settime(entity, ms)  fvad_settime(entity, ms)
+#define vad_feed(inst, data, len) fvad_feed(inst, data, len)
+#define vad_delete(inst) fvad_free(inst)
 
 #ifdef __cplusplus
 }
