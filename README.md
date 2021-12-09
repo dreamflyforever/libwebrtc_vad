@@ -9,9 +9,10 @@ functionality.
 ## Building and Installing ##
 libfvad uses autoconf/automake and can be build and installed with the usual:
 ```
-./configure
-make
-sudo make install
+for linux:
+	mkdir build; cd build; cmake ..
+for android:
+	ndk-build
 ```
 
  - When building from the cloned git repository (instead of a downloaded release),
