@@ -23,6 +23,7 @@ extern "C" {
 #define SILENT 0
 #define ERROR -1
 
+typedef int (*FVAD_CB)(int flag, const int16_t *frame, size_t len);
 /*
  * Type for a VAD instance, an opaque object created using fvad_new().
  */
@@ -67,7 +68,6 @@ void fvad_reset(Fvad *inst);
  */
 int fvad_set_mode(Fvad* inst, int mode);
 
-
 /*
  * Sets the input sample rate in Hz for a VAD instance.
  *
@@ -97,11 +97,14 @@ int fvad_feed(Fvad *inst, char *buffer, size_t size);
 
 int fvad_settime(Fvad* inst, size_t t);
 
+int fvad_callback(Fvad *inst, FVAD_CB cb);
 
 #define vad_init(entity, cb, arg) fvad_new(void)
 #define vad_settime(entity, ms)  fvad_settime(entity, ms)
 #define vad_feed(inst, data, len) fvad_feed(inst, data, len)
 #define vad_delete(inst) fvad_free(inst)
+#define vad_callback(inst, b) fvad_callback(inst, b)
+#define vad_set_mode(inst, b) fvad_set_mode(inst, b)
 
 #ifdef __cplusplus
 }

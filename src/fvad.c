@@ -16,7 +16,8 @@
 #include "vad/vad_core.h"
 
 #define __disable_irq()  
-#define __enable_irq()  
+#define __enable_irq()
+
 typedef struct Circle_Queue
 {
     uint8_t *data;    //队列数据
@@ -245,7 +246,7 @@ out:
 
 
 
-static char g_queue[1024+319];
+static uint8_t g_queue[1024+319];
 circle_queue_struct queue_entity;
 // valid sample rates in kHz
 static const int valid_rates[] = { 8, 16, 32, 48 };
@@ -267,6 +268,7 @@ struct Fvad {
     size_t rate_idx; // index in valid_rates and process_funcs arrays
     size_t count;
     size_t time;
+    FVAD_CB cb;
 };
 
 
@@ -275,6 +277,7 @@ Fvad *fvad_new(void)
     Fvad *inst = malloc(sizeof *inst);
     if (inst) fvad_reset(inst);
     inst->count = 0;
+    inst->cb = NULL;
     circle_queue_init(&queue_entity,
                        g_queue,
                        1024+319);
@@ -296,6 +299,7 @@ void fvad_reset(Fvad *inst)
     int rv = WebRtcVad_InitCore(&inst->core);
     assert(rv == 0);
     inst->rate_idx = 1;
+    //fvad_set_mode(inst, 3);
 }
 
 
@@ -375,6 +379,10 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 		}
 	}
 
+	if (inst->cb != NULL) {
+		inst->cb(rv, frame, length);
+	}
+
 	return rv;
 }
 
@@ -383,4 +391,10 @@ int fvad_settime(Fvad* inst, size_t t)
 	int retval = 0;
 	inst->time = t;
 	return retval;
+}
+
+int fvad_callback(Fvad *inst, FVAD_CB cb)
+{
+	inst->cb = cb;
+	return 0;
 }
