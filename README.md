@@ -62,3 +62,6 @@ After this import, the changes can be merged first into the `upstream-renamed`
 branch and then into the `master` branch. The intermediate step is necessary
 because *git merge* would treat files that were both renamed and heavily changed
 as new files.
+
+### PS
+Maybe compile errro: apt install libsndfile1-dev
