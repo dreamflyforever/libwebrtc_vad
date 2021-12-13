@@ -349,7 +349,12 @@ int fvad_feed(Fvad *inst, char *buffer, size_t size)
 		circle_queue_out(&queue_entity, (uint8_t *)buf, 320);
 		memcpy(bb, buf, 320);
 		rv = fvad_process(inst, bb, 160);
+		if (rv == 0) {
+			printf("detect silent.................\n");
+			goto out;
+		}
 	}
+out:
 	return rv;
 }
 
@@ -382,7 +387,7 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 	if (inst->cb != NULL) {
 		inst->cb(rv, frame, length);
 	}
-
+	printf("inst->count: %d, rv:%d\n", inst->count, rv);
 	return rv;
 }
 
