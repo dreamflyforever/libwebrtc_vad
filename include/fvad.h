@@ -99,12 +99,20 @@ int fvad_settime(Fvad* inst, size_t t);
 
 int fvad_callback(Fvad *inst, FVAD_CB cb);
 
+int fvad_setfunc(Fvad *inst, int addbos);
+
+int fvad_setspeechtime(Fvad* inst, size_t t);
+
 #define vad_init(entity, cb, arg) fvad_new(void)
 #define vad_settime(entity, ms)  fvad_settime(entity, ms)
 #define vad_feed(inst, data, len) fvad_feed(inst, data, len)
 #define vad_delete(inst) fvad_free(inst)
 #define vad_callback(inst, b) fvad_callback(inst, b)
 #define vad_set_mode(inst, b) fvad_set_mode(inst, b)
+#define vad_setspeechtime(inst, t) fvad_setspeechtime(inst, t)
+
+#define vad_setfunc(inst, addbos) fvad_setfunc(inst, addbos)
+
 
 #ifdef __cplusplus
 }

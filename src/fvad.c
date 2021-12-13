@@ -267,7 +267,10 @@ struct Fvad {
     VadInstT core;
     size_t rate_idx; // index in valid_rates and process_funcs arrays
     size_t count;
+    size_t speech_count;
+    size_t speech_time;
     size_t time;
+    size_t addbos;
     FVAD_CB cb;
 };
 
@@ -277,6 +280,8 @@ Fvad *fvad_new(void)
     Fvad *inst = malloc(sizeof *inst);
     if (inst) fvad_reset(inst);
     inst->count = 0;
+    inst->addbos = 0;
+    inst->speech_count = 0;
     inst->cb = NULL;
     circle_queue_init(&queue_entity,
                        g_queue,
@@ -360,6 +365,7 @@ out:
 
 int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 {
+	static int once = 0;
 	assert(inst);
 	if (!valid_length(inst->rate_idx, length))
 		return -1;
@@ -368,26 +374,55 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 	assert (rv >= 0);
 
 	if (rv > 0) {
-		rv = 1;
-		printf("speech...\n");
-		//inst->count = 0;
+		rv = 2;
+		if (once == 0) {
+			printf("speech... speech_count %d, speech_time:%d\n", inst->speech_count, inst->speech_time);
+			inst->speech_count++;
+			if (inst->speech_count >= inst->speech_time) {
+				inst->speech_count = 0;
+				rv = 1;
+				once++;
+			}
+		} else { //printf("goto detect silent...");
+		}
 	} else {
-		printf("slient...\n");
-		/*sum the count*/
-		inst->count++;
-		if (inst->count >= inst->time) {
-			inst->count = 0;
-			//circle_queue_erase(&queue_entity);
-			//memset(g_queue, 0, 1024+319);
+		if (inst->addbos == 1) {
+			if ((once%2) == 1) {
+				printf("slient...\n");
+				/*sum the count*/
+				inst->count++;
+				if (inst->count >= inst->time) {
+					inst->count = 0;
+					once = 0;
+					//circle_queue_erase(&queue_entity);
+					//memset(g_queue, 0, 1024+319);
+				} else {
+					rv = 2;
+				}
+			} else {
+				rv = 2;
+			}
 		} else {
-			rv = 1;
+			printf("slient...\n");
+			/*sum the count*/
+			inst->count++;
+			if (inst->count >= inst->time) {
+				inst->count = 0;
+				//circle_queue_erase(&queue_entity);
+				//memset(g_queue, 0, 1024+319);
+			} else {
+				rv = 2;
+			}
 		}
 	}
 
 	if (inst->cb != NULL) {
 		inst->cb(rv, frame, length);
 	}
-	printf("inst->count: %d, rv:%d\n", inst->count, rv);
+	if (rv == 1)
+		printf("speech start\n");
+	if (rv == 0)
+		printf("detect silent\n");
 	return rv;
 }
 
@@ -398,8 +433,21 @@ int fvad_settime(Fvad* inst, size_t t)
 	return retval;
 }
 
+int fvad_setspeechtime(Fvad* inst, size_t t)
+{
+	int retval = 0;
+	inst->speech_time = t;
+	return retval;
+}
+
 int fvad_callback(Fvad *inst, FVAD_CB cb)
 {
 	inst->cb = cb;
+	return 0;
+}
+
+int fvad_setfunc(Fvad *inst, int addbos)
+{
+	inst->addbos = addbos;
 	return 0;
 }
