@@ -23,7 +23,7 @@ extern "C" {
 #define SILENT 0
 #define ERROR -1
 
-typedef int (*FVAD_CB)(int flag, const int16_t *frame, size_t len);
+typedef int (*FVAD_CB)(int flag, char *frame, size_t len);
 /*
  * Type for a VAD instance, an opaque object created using fvad_new().
  */
@@ -93,7 +93,7 @@ int fvad_set_sample_rate(Fvad* inst, int sample_rate);
  */
 int fvad_process(Fvad* inst, const int16_t* frame, size_t length);
 
-int fvad_feed(Fvad *inst, char *buffer, size_t size);
+int fvad_feed(Fvad *inst, const char *buffer, size_t size);
 
 int fvad_settime(Fvad* inst, size_t t);
 
@@ -112,7 +112,6 @@ int fvad_setspeechtime(Fvad* inst, size_t t);
 #define vad_setspeechtime(inst, t) fvad_setspeechtime(inst, t)
 
 #define vad_setfunc(inst, addbos) fvad_setfunc(inst, addbos)
-
 
 #ifdef __cplusplus
 }

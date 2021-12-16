@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "vad/vad_core.h"
-
+#include <stdio.h>
 #define __disable_irq()  
 #define __enable_irq()
 
@@ -248,6 +248,10 @@ out:
 
 static uint8_t g_queue[1024+319];
 circle_queue_struct queue_entity;
+
+static uint8_t bos_queue[1024 * 64];
+circle_queue_struct bos_entity;
+
 // valid sample rates in kHz
 static const int valid_rates[] = { 8, 16, 32, 48 };
 
@@ -274,19 +278,35 @@ struct Fvad {
     FVAD_CB cb;
 };
 
+#define save_file 0
+#if save_file
+FILE *fp;
+#endif
 
 Fvad *fvad_new(void)
 {
-    Fvad *inst = malloc(sizeof *inst);
-    if (inst) fvad_reset(inst);
-    inst->count = 0;
-    inst->addbos = 0;
-    inst->speech_count = 0;
-    inst->cb = NULL;
-    circle_queue_init(&queue_entity,
-                       g_queue,
-                       1024+319);
-    return inst;
+	Fvad *inst = malloc(sizeof *inst);
+	if (inst) fvad_reset(inst);
+	inst->count = 0;
+	inst->addbos = 0;
+	inst->speech_count = 0;
+	inst->cb = NULL;
+	circle_queue_init(&queue_entity,
+			g_queue,
+			1024+319);
+	circle_queue_init(&bos_entity,
+			bos_queue,
+			1024*64);
+#if save_file
+	time_t t;
+	char t_buf[1024] = {0};
+	time(&t);
+	ctime_r(&t, t_buf);
+	printf("file name: %s\n", t_buf);
+	if ((fp = fopen(t_buf,"w")) < 0)
+		printf("open sound.pcm fial\n");
+#endif
+	return inst;
 }
 
 
@@ -329,7 +349,6 @@ int fvad_set_sample_rate(Fvad* inst, int sample_rate)
     return -1;
 }
 
-
 static bool valid_length(size_t rate_idx, size_t length)
 {
     int samples_per_ms = valid_rates[rate_idx];
@@ -340,12 +359,19 @@ static bool valid_length(size_t rate_idx, size_t length)
     return false;
 }
 
-int fvad_feed(Fvad *inst, char *buffer, size_t size)
+
+int fvad_feed(Fvad *inst, const char *buffer, size_t size)
 {
+	static int flag = 0;
+	if (-3 == circle_queue_in(&bos_entity, buffer, size)){
+		char bbbb[1024];
+		circle_queue_out(&bos_entity, (uint8_t *)bbbb, size);
+		circle_queue_in(&bos_entity, buffer, size);
+	}
+
 	int s, y, rv = 0, i;
 	uint8_t buf[320] = {0};
 	uint16_t bb[160] = {0};
-	//queue_put(buffer, size);
 	circle_queue_in(&queue_entity, buffer, size);
 	s = queue_entity.len/ 320;
 	//printf("s: %d, len: %d\n", s, queue_entity.len);
@@ -356,10 +382,54 @@ int fvad_feed(Fvad *inst, char *buffer, size_t size)
 		rv = fvad_process(inst, bb, 160);
 		if (rv == 0) {
 			printf("detect silent.................\n");
+			if (inst->cb != NULL)
+				inst->cb(rv, buffer, size);
+			flag = 0;
+#if save_file
+			int rc = fwrite(buffer, 1, size, fp);  
+			if (rc != size) {
+				fprintf(stderr,  "short write: wrote %d bytes/n", rc);  
+			}
+			fclose(fp);
+#endif
+			goto out;
+		}
+		if (rv == 1) {
+			printf("detect speech.................\n");
+			if (inst->cb != NULL) {
+				char bbb[1024*64] = {0};
+				int s = 16 * 2 * inst->speech_time + 1024;
+				if (s > 1024 * 64) s = 1024 * 64 + 1024;
+				circle_queue_out(&bos_entity, (uint8_t *)bbb, s);
+				inst->cb(rv, bbb, 1024*64);
+				circle_queue_erase(&bos_entity);
+			}
+			flag = 1;
+#if save_file
+			int rc = fwrite(buffer, 1, size, fp);  
+			if (rc != size) {
+				fprintf(stderr,  "short write: wrote %d bytes/n", rc);  
+			}
+#endif
 			goto out;
 		}
 	}
+
 out:
+	if (rv == 2) {
+		printf("rv 2 \n");
+		if (inst->cb != NULL) {
+			if (flag == 1) {
+				inst->cb(rv, buffer, size);
+#if save_file
+				int rc = fwrite(buffer, 1, size, fp);  
+				if (rc != size) {
+					fprintf(stderr,  "short write: wrote %d bytes/n", rc);  
+				}
+#endif
+			}
+		}
+	}
 	return rv;
 }
 
@@ -372,16 +442,15 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 
 	int rv = process_funcs[inst->rate_idx](&inst->core, frame, length);
 	assert (rv >= 0);
-
 	if (rv > 0) {
 		rv = 2;
 		if (once == 0) {
-			printf("speech... speech_count %d, speech_time:%d\n", inst->speech_count, inst->speech_time);
 			inst->speech_count++;
 			if (inst->speech_count >= inst->speech_time) {
 				inst->speech_count = 0;
 				rv = 1;
 				once++;
+				//fvad_getbos_buffer(inst, getbos_buffer, 1024*96);
 			}
 		} else { //printf("goto detect silent...");
 		}
@@ -416,9 +485,6 @@ int fvad_process(Fvad* inst, const int16_t* frame, size_t length)
 		}
 	}
 
-	if (inst->cb != NULL) {
-		inst->cb(rv, frame, length);
-	}
 	if (rv == 1)
 		printf("speech start\n");
 	if (rv == 0)
