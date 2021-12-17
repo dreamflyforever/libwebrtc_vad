@@ -11,6 +11,7 @@
 
 #include "../include/fvad.h"
 
+#define bos_buffer (1024 * 96)
 #include <stdlib.h>
 #include <string.h>
 #include "vad/vad_core.h"
@@ -61,7 +62,7 @@ int circle_queue_erase(circle_queue_struct *queue)
     __disable_irq();
     //queue->data=NULL;
     queue->len=0;
-    queue->size=0;
+    //queue->size=0;
     queue->head=0;
     queue->tail=0;
     __enable_irq();
@@ -249,7 +250,7 @@ out:
 static uint8_t g_queue[1024+319];
 circle_queue_struct queue_entity;
 
-static uint8_t bos_queue[1024 * 64];
+static uint8_t bos_queue[bos_buffer];
 circle_queue_struct bos_entity;
 
 // valid sample rates in kHz
@@ -296,7 +297,7 @@ Fvad *fvad_new(void)
 			1024+319);
 	circle_queue_init(&bos_entity,
 			bos_queue,
-			1024*64);
+			bos_buffer);
 #if save_file
 	time_t t;
 	char t_buf[1024] = {0};
@@ -363,10 +364,11 @@ static bool valid_length(size_t rate_idx, size_t length)
 int fvad_feed(Fvad *inst, const char *buffer, size_t size)
 {
 	static int flag = 0;
-	if (-3 == circle_queue_in(&bos_entity, buffer, size)){
+	int retvalue = circle_queue_in(&bos_entity, buffer, size);
+	printf("qlen: %d, rv: %d\n", bos_entity.len, retvalue);
+	if ( (bos_buffer-1024) <= bos_entity.len) {
 		char bbbb[1024];
 		circle_queue_out(&bos_entity, (uint8_t *)bbbb, size);
-		circle_queue_in(&bos_entity, buffer, size);
 	}
 
 	int s, y, rv = 0, i;
@@ -392,17 +394,20 @@ int fvad_feed(Fvad *inst, const char *buffer, size_t size)
 			}
 			fclose(fp);
 #endif
+			circle_queue_erase(&bos_entity);
+			memset(bos_queue, 0, bos_buffer);
 			goto out;
 		}
 		if (rv == 1) {
 			printf("detect speech.................\n");
 			if (inst->cb != NULL) {
-				char bbb[1024*64] = {0};
-				int s = 16 * 2 * inst->speech_time + 1024;
-				if (s > 1024 * 64) s = 1024 * 64 + 1024;
-				circle_queue_out(&bos_entity, (uint8_t *)bbb, s);
-				inst->cb(rv, bbb, 1024*64);
+				char bbb[bos_buffer] = {0};
+				int s = bos_entity.len;//16 * 2 * inst->speech_time + 1024*40;
+				if (s > bos_buffer) s = bos_buffer;
+				circle_queue_out(&bos_entity, (uint8_t *)bbb, bos_entity.len);
+				inst->cb(rv, bbb, s);
 				circle_queue_erase(&bos_entity);
+				memset(bos_queue, 0, bos_buffer);
 			}
 			flag = 1;
 #if save_file
